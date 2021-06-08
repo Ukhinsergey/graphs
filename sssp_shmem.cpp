@@ -206,9 +206,11 @@ void move_to_new_bucket(int bucket, vertex_id_t v, double dist) {
 }
 
 void shmem_sssp(vertex_id_t root, graph_t *G, weight_t *dist) {
+    struct timespec start_ts, finish_ts;
     int *numdist[shmem_n_pes()];
     double *changeddist[shmem_n_pes()];
     int *changedindex[shmem_n_pes()];
+    unsigned long long numsends = 0;
     for(int i = 0 ; i < shmem_n_pes(); ++i) {
         numdist[i] = (int *) shmalloc(sizeof(int));
         numdist[i][0] = 0;
@@ -232,6 +234,7 @@ void shmem_sssp(vertex_id_t root, graph_t *G, weight_t *dist) {
     }
     shmem_barrier_all();
     shmem_int_min_to_all(othermem, mymem, 1, 0, 0, shmem_n_pes(), pwrk, psync);
+    shmem_flush();
     shmem_barrier_all();
     shmem_free(pwrk);
     shmem_free(psync);
@@ -261,6 +264,8 @@ void shmem_sssp(vertex_id_t root, graph_t *G, weight_t *dist) {
                         int owner = VERTEX_OWNER2(to);
                         double distto;
                         shmem_double_get(&distto, (const double *) &(dist[VERTEX_LOCAL2(to)]), 1, owner);
+                        shmem_flush();
+                        numsends++;
                         if (distto > dist[*from] + weight) {
                             distto = dist[*from] + weight;
                             not_my_upd1[owner].push_back(VERTEX_LOCAL2(to));
@@ -275,8 +280,11 @@ void shmem_sssp(vertex_id_t root, graph_t *G, weight_t *dist) {
             int num = not_my_upd1[i].size();
             if (i != my_pe() && num != 0) {
                 shmem_int_put(numdist[my_pe()], &num, 1, i);
+                shmem_flush();
                 shmem_int_put(changedindex[my_pe()], not_my_upd1[i].data(), num, i);
+                shmem_flush();
                 shmem_double_put(changeddist[my_pe()], not_my_upd2[i].data(), num, i);
+                shmem_flush();
             }
         }
         shmem_barrier_all();
@@ -319,6 +327,7 @@ void shmem_sssp(vertex_id_t root, graph_t *G, weight_t *dist) {
         }
         shmem_barrier_all();
         shmem_int_min_to_all(othermem, mymem, 1, 0, 0, shmem_n_pes(), pwrk, psync);
+        shmem_flush();
         shmem_free(pwrk);
         shmem_free(psync);
         shmem_barrier_all();
@@ -335,6 +344,9 @@ void shmem_sssp(vertex_id_t root, graph_t *G, weight_t *dist) {
         shmem_free(changedindex[i]);
     }
 
+    if (my_pe() == 0) {
+        cout << "numsends = " << numsends << endl;
+    }
 
 }
 
