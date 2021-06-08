@@ -170,7 +170,7 @@ int main(int argc, char **argv)
         double time = (finish_ts.tv_nsec - (double)start_ts.tv_nsec) * 1.0e-9 + (finish_ts.tv_sec - (double)start_ts.tv_sec);
         
         perf[i] = time;
-        printf("time = %.4f\n", time);
+        // printf("time = %.4f\n", time);
 
         if (rootNumberToValidate == i) {
             /* writing for validation */

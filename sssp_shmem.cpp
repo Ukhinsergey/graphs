@@ -260,17 +260,22 @@ void shmem_sssp(vertex_id_t root, graph_t *G, weight_t *dist) {
                             dist[to] = dist[*from] + weight;
                             my_upd.push_back(to);
                         }
+                    // } else {
+                    //     int owner = VERTEX_OWNER2(to);
+                    //     double distto;
+                    //     shmem_double_get(&distto, (const double *) &(dist[VERTEX_LOCAL2(to)]), 1, owner);
+                    //     shmem_flush();
+                    //     numsends++;
+                    //     if (distto > dist[*from] + weight) {
+                    //         distto = dist[*from] + weight;
+                    //         not_my_upd1[owner].push_back(VERTEX_LOCAL2(to));
+                    //         not_my_upd2[owner].push_back(distto);
+                    //     }
+                    // }
                     } else {
                         int owner = VERTEX_OWNER2(to);
-                        double distto;
-                        shmem_double_get(&distto, (const double *) &(dist[VERTEX_LOCAL2(to)]), 1, owner);
-                        shmem_flush();
-                        numsends++;
-                        if (distto > dist[*from] + weight) {
-                            distto = dist[*from] + weight;
-                            not_my_upd1[owner].push_back(VERTEX_LOCAL2(to));
-                            not_my_upd2[owner].push_back(distto);
-                        }
+                        not_my_upd1[owner].push_back(VERTEX_LOCAL2(to));
+                        not_my_upd2[owner].push_back(dist[*from] + weight);
                     }
                 }
             }
@@ -332,9 +337,9 @@ void shmem_sssp(vertex_id_t root, graph_t *G, weight_t *dist) {
         shmem_free(psync);
         shmem_barrier_all();
         numbucket = *othermem;
-        if (my_pe() == 0) {
-            cout << "numbucket = " << numbucket << endl;
-        }
+        // if (my_pe() == 0) {
+        //     cout << "numbucket = " << numbucket << endl;
+        // }
     }
     shmem_free(mymem);
     shmem_free(othermem);
@@ -371,10 +376,12 @@ int main(int argc, char **argv)
     dist = (weight_t *) shmalloc(g.local_n * sizeof(weight_t));
     
  
+    double alltime = 0;
     for (uint32_t i = 0; i < 1; ++i) {
         /* initializing, DBL_MAX == infinity */
         curbuckets.clear();
         curbuckets.insert(INF_BUCKET);
+        vertex_in_bucket.clear();
 
         for (vertex_id_t j = 0; j < g.local_n; j++) {
             dist[j] = DBL_MAX;
@@ -392,6 +399,10 @@ int main(int argc, char **argv)
             /* writing for validation */
             writeDistance(outFilename, dist, g.n, offsets);
         } 
+        alltime += time;
+    }
+    if (my_pe() == 0) {
+        cout << "alltime = " << alltime << endl;
     }
 
     freeGraph(&g);
